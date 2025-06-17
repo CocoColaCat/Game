@@ -5,199 +5,661 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>記憶配對遊戲</title>
+    <title>2D槍戰遊戲</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            background: linear-gradient(135deg, #6366f1, #a855f7);
-            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            background: #111827;
             font-family: 'Microsoft JhengHei', sans-serif;
+            touch-action: none;
         }
-        .card {
-            perspective: 1000px;
-            transition: transform 0.2s;
-        }
-        .card:hover {
-            transform: scale(1.05);
-        }
-        .card-inner {
-            transition: transform 0.6s;
-            transform-style: preserve-3d;
-        }
-        .card.flipped .card-inner {
-            transform: rotateY(180deg);
-        }
-        .card-front, .card-back {
-            backface-visibility: hidden;
-            position: absolute;
-            top: 0;
-            left: 0;
+        #game-container {
+            position: relative;
             width: 100%;
-            height: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #0f172a, #1e293b);
         }
-        .card-front {
-            transform: rotateY(180deg);
+        #player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: #3b82f6;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        .bullet {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #f59e0b;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+        }
+        .enemy {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+        }
+        .explosion {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #fcd34d, #f97316, #ef4444);
+            transform: translate(-50%, -50%);
+            z-index: 4;
+            animation: explode 0.5s forwards;
+        }
+        @keyframes explode {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+        }
+        .health-bar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 200px;
+            height: 20px;
+            background-color: #1f2937;
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 20;
+        }
+        .health-fill {
+            height: 100%;
+            background-color: #10b981;
+            transition: width 0.3s;
+        }
+        .score {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 20;
+        }
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 30;
+        }
+        .control-pad {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 150px;
+            height: 150px;
+            z-index: 20;
+        }
+        .control-button {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            color: white;
+            font-size: 24px;
+            user-select: none;
         }
-        .card-back {
-            background: linear-gradient(45deg, #3b82f6, #2563eb);
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .confetti {
+        .shoot-button {
             position: absolute;
-            width: 10px;
-            height: 10px;
-            opacity: 0;
+            bottom: 20px;
+            right: 20px;
+            width: 70px;
+            height: 70px;
+            background-color: rgba(239, 68, 68, 0.6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            user-select: none;
+            z-index: 20;
+        }
+        .star {
+            position: absolute;
+            background-color: white;
+            border-radius: 50%;
+            z-index: 1;
         }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center p-4">
-    <div class="bg-white bg-opacity-90 rounded-xl shadow-xl p-6 w-full max-w-lg">
-        <h1 class="text-3xl font-bold text-center text-indigo-700 mb-2">記憶配對遊戲</h1>
-        <div class="flex justify-between items-center mb-4">
-            <div class="text-lg font-medium text-gray-700">步數: <span id="moves">0</span></div>
-            <button id="restart" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">重新開始</button>
+<body>
+    <div id="game-container">
+        <div id="player"></div>
+        <div class="health-bar">
+            <div id="health-fill" class="health-fill" style="width: 100%;"></div>
         </div>
+        <div class="score">分數: <span id="score">0</span></div>
         
-        <div id="game-board" class="grid grid-cols-4 gap-3 mb-4"></div>
+        <!-- 移動控制 (僅在觸控設備上顯示) -->
+        <div class="control-pad hidden md:hidden">
+            <div id="up-button" class="control-button" style="top: 0; left: 50px; transform: translateX(-50%);">↑</div>
+            <div id="left-button" class="control-button" style="top: 50px; left: 0; transform: translateY(-50%);">←</div>
+            <div id="right-button" class="control-button" style="top: 50px; left: 100px; transform: translateY(-50%);">→</div>
+            <div id="down-button" class="control-button" style="top: 100px; left: 50px; transform: translateX(-50%);">↓</div>
+        </div>
+        <div id="shoot-button" class="shoot-button hidden md:hidden">射擊</div>
         
-        <div id="message" class="hidden text-center py-3 px-4 rounded-lg text-lg font-bold"></div>
+        <div id="game-over" class="game-over hidden">
+            <h2 class="text-2xl font-bold mb-4">遊戲結束</h2>
+            <p class="mb-4">最終分數: <span id="final-score">0</span></p>
+            <button id="restart-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">重新開始</button>
+        </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const emojis = ['🍎', '🍌', '🍇', '🍊', '🍓', '🍉', '🍍', '🥑'];
-            const gameBoard = document.getElementById('game-board');
-            const movesDisplay = document.getElementById('moves');
-            const restartButton = document.getElementById('restart');
-            const messageDisplay = document.getElementById('message');
+            const gameContainer = document.getElementById('game-container');
+            const player = document.getElementById('player');
+            const healthFill = document.getElementById('health-fill');
+            const scoreDisplay = document.getElementById('score');
+            const finalScoreDisplay = document.getElementById('final-score');
+            const gameOverScreen = document.getElementById('game-over');
+            const restartButton = document.getElementById('restart-button');
             
-            let cards = [];
-            let flippedCards = [];
-            let matchedPairs = 0;
-            let moves = 0;
-            let canFlip = true;
-            
+            // 遊戲狀態
+            let gameState = {
+                playerX: window.innerWidth / 2,
+                playerY: window.innerHeight / 2,
+                playerSpeed: 5,
+                playerHealth: 100,
+                bullets: [],
+                enemies: [],
+                explosions: [],
+                score: 0,
+                gameOver: false,
+                keys: {
+                    ArrowUp: false,
+                    ArrowDown: false,
+                    ArrowLeft: false,
+                    ArrowRight: false,
+                    w: false,
+                    a: false,
+                    s: false,
+                    d: false,
+                    ' ': false
+                },
+                touchControls: {
+                    up: false,
+                    down: false,
+                    left: false,
+                    right: false,
+                    shoot: false
+                },
+                lastShootTime: 0,
+                shootCooldown: 300, // 射擊冷卻時間 (毫秒)
+                enemySpawnRate: 1500, // 敵人生成間隔 (毫秒)
+                lastEnemySpawnTime: 0,
+                stars: []
+            };
+
+            // 創建星星背景
+            function createStars() {
+                for (let i = 0; i < 100; i++) {
+                    const star = document.createElement('div');
+                    star.className = 'star';
+                    
+                    const size = Math.random() * 2 + 1;
+                    const opacity = Math.random() * 0.7 + 0.3;
+                    
+                    star.style.width = `${size}px`;
+                    star.style.height = `${size}px`;
+                    star.style.opacity = opacity;
+                    star.style.left = `${Math.random() * 100}%`;
+                    star.style.top = `${Math.random() * 100}%`;
+                    
+                    gameContainer.appendChild(star);
+                    gameState.stars.push({
+                        element: star,
+                        speed: Math.random() * 0.3 + 0.1,
+                        x: parseFloat(star.style.left),
+                        y: parseFloat(star.style.top)
+                    });
+                }
+            }
+
+            // 更新星星位置
+            function updateStars() {
+                gameState.stars.forEach(star => {
+                    star.y += star.speed;
+                    if (star.y > 100) {
+                        star.y = 0;
+                        star.x = Math.random() * 100;
+                    }
+                    star.element.style.top = `${star.y}%`;
+                    star.element.style.left = `${star.x}%`;
+                });
+            }
+
+            // 初始化遊戲
             function initGame() {
-                // Reset game state
-                cards = [];
-                flippedCards = [];
-                matchedPairs = 0;
-                moves = 0;
-                canFlip = true;
-                movesDisplay.textContent = '0';
-                gameBoard.innerHTML = '';
-                messageDisplay.classList.add('hidden');
+                gameState = {
+                    playerX: window.innerWidth / 2,
+                    playerY: window.innerHeight / 2,
+                    playerSpeed: 5,
+                    playerHealth: 100,
+                    bullets: [],
+                    enemies: [],
+                    explosions: [],
+                    score: 0,
+                    gameOver: false,
+                    keys: {
+                        ArrowUp: false,
+                        ArrowDown: false,
+                        ArrowLeft: false,
+                        ArrowRight: false,
+                        w: false,
+                        a: false,
+                        s: false,
+                        d: false,
+                        ' ': false
+                    },
+                    touchControls: {
+                        up: false,
+                        down: false,
+                        left: false,
+                        right: false,
+                        shoot: false
+                    },
+                    lastShootTime: 0,
+                    shootCooldown: 300,
+                    enemySpawnRate: 1500,
+                    lastEnemySpawnTime: 0,
+                    stars: gameState.stars || []
+                };
                 
-                // Create card pairs
-                const cardValues = [...emojis, ...emojis];
+                // 清除所有子彈和敵人
+                document.querySelectorAll('.bullet, .enemy, .explosion').forEach(el => el.remove());
                 
-                // Shuffle cards
-                for (let i = cardValues.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [cardValues[i], cardValues[j]] = [cardValues[j], cardValues[i]];
+                // 重置顯示
+                healthFill.style.width = '100%';
+                scoreDisplay.textContent = '0';
+                gameOverScreen.classList.add('hidden');
+                
+                // 重置玩家位置
+                updatePlayerPosition();
+                
+                // 如果沒有星星，創建星星
+                if (gameState.stars.length === 0) {
+                    createStars();
                 }
                 
-                // Create card elements
-                cardValues.forEach((value, index) => {
-                    const card = document.createElement('div');
-                    card.className = 'card relative h-20 cursor-pointer';
-                    card.innerHTML = `
-                        <div class="card-inner w-full h-full relative">
-                            <div class="card-front absolute rounded-lg bg-white shadow-md border-2 border-indigo-200">${value}</div>
-                            <div class="card-back absolute rounded-lg flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                        </div>
-                    `;
+                // 開始遊戲循環
+                if (!gameLoopId) {
+                    gameLoopId = requestAnimationFrame(gameLoop);
+                }
+            }
+
+            // 更新玩家位置
+            function updatePlayerPosition() {
+                player.style.left = `${gameState.playerX}px`;
+                player.style.top = `${gameState.playerY}px`;
+            }
+
+            // 創建子彈
+            function createBullet(x, y, dirX, dirY) {
+                const bullet = document.createElement('div');
+                bullet.className = 'bullet';
+                bullet.style.left = `${x}px`;
+                bullet.style.top = `${y}px`;
+                gameContainer.appendChild(bullet);
+                
+                const speed = 10;
+                const distance = Math.sqrt(dirX * dirX + dirY * dirY);
+                const normalizedDirX = dirX / distance;
+                const normalizedDirY = dirY / distance;
+                
+                gameState.bullets.push({
+                    element: bullet,
+                    x: x,
+                    y: y,
+                    dirX: normalizedDirX * speed,
+                    dirY: normalizedDirY * speed
+                });
+            }
+
+            // 射擊
+            function shoot() {
+                const now = Date.now();
+                if (now - gameState.lastShootTime < gameState.shootCooldown) return;
+                
+                gameState.lastShootTime = now;
+                
+                // 獲取滑鼠位置或默認向右射擊
+                let dirX = 1;
+                let dirY = 0;
+                
+                if (lastMouseX && lastMouseY) {
+                    dirX = lastMouseX - gameState.playerX;
+                    dirY = lastMouseY - gameState.playerY;
+                }
+                
+                createBullet(gameState.playerX, gameState.playerY, dirX, dirY);
+            }
+
+            // 更新子彈位置
+            function updateBullets() {
+                for (let i = gameState.bullets.length - 1; i >= 0; i--) {
+                    const bullet = gameState.bullets[i];
+                    bullet.x += bullet.dirX;
+                    bullet.y += bullet.dirY;
                     
-                    card.addEventListener('click', () => flipCard(card, value, index));
-                    gameBoard.appendChild(card);
-                    cards.push(card);
+                    // 更新DOM元素位置
+                    bullet.element.style.left = `${bullet.x}px`;
+                    bullet.element.style.top = `${bullet.y}px`;
+                    
+                    // 檢查子彈是否超出邊界
+                    if (
+                        bullet.x < 0 ||
+                        bullet.x > window.innerWidth ||
+                        bullet.y < 0 ||
+                        bullet.y > window.innerHeight
+                    ) {
+                        bullet.element.remove();
+                        gameState.bullets.splice(i, 1);
+                    }
+                }
+            }
+
+            // 創建敵人
+            function createEnemy() {
+                const now = Date.now();
+                if (now - gameState.lastEnemySpawnTime < gameState.enemySpawnRate) return;
+                
+                gameState.lastEnemySpawnTime = now;
+                
+                // 隨機決定敵人從哪個邊緣生成
+                let x, y;
+                const side = Math.floor(Math.random() * 4);
+                
+                switch (side) {
+                    case 0: // 上
+                        x = Math.random() * window.innerWidth;
+                        y = -20;
+                        break;
+                    case 1: // 右
+                        x = window.innerWidth + 20;
+                        y = Math.random() * window.innerHeight;
+                        break;
+                    case 2: // 下
+                        x = Math.random() * window.innerWidth;
+                        y = window.innerHeight + 20;
+                        break;
+                    case 3: // 左
+                        x = -20;
+                        y = Math.random() * window.innerHeight;
+                        break;
+                }
+                
+                const enemy = document.createElement('div');
+                enemy.className = 'enemy';
+                enemy.style.left = `${x}px`;
+                enemy.style.top = `${y}px`;
+                gameContainer.appendChild(enemy);
+                
+                const speed = 2 + Math.random() * 1.5;
+                
+                gameState.enemies.push({
+                    element: enemy,
+                    x: x,
+                    y: y,
+                    speed: speed
+                });
+                
+                // 隨著分數增加，敵人生成速度加快
+                gameState.enemySpawnRate = Math.max(300, 1500 - gameState.score / 10);
+            }
+
+            // 更新敵人位置
+            function updateEnemies() {
+                for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+                    const enemy = gameState.enemies[i];
+                    
+                    // 計算敵人到玩家的方向
+                    const dirX = gameState.playerX - enemy.x;
+                    const dirY = gameState.playerY - enemy.y;
+                    const distance = Math.sqrt(dirX * dirX + dirY * dirY);
+                    
+                    // 更新敵人位置
+                    enemy.x += (dirX / distance) * enemy.speed;
+                    enemy.y += (dirY / distance) * enemy.speed;
+                    
+                    // 更新DOM元素位置
+                    enemy.element.style.left = `${enemy.x}px`;
+                    enemy.element.style.top = `${enemy.y}px`;
+                    
+                    // 檢查敵人是否與玩家碰撞
+                    if (distance < 35) { // 玩家半徑 + 敵人半徑
+                        // 玩家受傷
+                        gameState.playerHealth -= 10;
+                        healthFill.style.width = `${gameState.playerHealth}%`;
+                        
+                        // 創建爆炸效果
+                        createExplosion(enemy.x, enemy.y);
+                        
+                        // 移除敵人
+                        enemy.element.remove();
+                        gameState.enemies.splice(i, 1);
+                        
+                        // 檢查遊戲是否結束
+                        if (gameState.playerHealth <= 0) {
+                            endGame();
+                        }
+                    }
+                    
+                    // 檢查敵人是否與子彈碰撞
+                    for (let j = gameState.bullets.length - 1; j >= 0; j--) {
+                        const bullet = gameState.bullets[j];
+                        const bulletDistance = Math.sqrt(
+                            Math.pow(bullet.x - enemy.x, 2) + 
+                            Math.pow(bullet.y - enemy.y, 2)
+                        );
+                        
+                        if (bulletDistance < 20) { // 子彈半徑 + 敵人半徑
+                            // 創建爆炸效果
+                            createExplosion(enemy.x, enemy.y);
+                            
+                            // 增加分數
+                            gameState.score += 10;
+                            scoreDisplay.textContent = gameState.score;
+                            
+                            // 移除子彈和敵人
+                            bullet.element.remove();
+                            gameState.bullets.splice(j, 1);
+                            
+                            enemy.element.remove();
+                            gameState.enemies.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 創建爆炸效果
+            function createExplosion(x, y) {
+                const explosion = document.createElement('div');
+                explosion.className = 'explosion';
+                explosion.style.left = `${x}px`;
+                explosion.style.top = `${y}px`;
+                gameContainer.appendChild(explosion);
+                
+                gameState.explosions.push({
+                    element: explosion,
+                    createdAt: Date.now()
+                });
+                
+                // 爆炸音效
+                // 注意：根據Canva Code的規則，我們不能添加音頻
+            }
+
+            // 更新爆炸效果
+            function updateExplosions() {
+                const now = Date.now();
+                for (let i = gameState.explosions.length - 1; i >= 0; i--) {
+                    const explosion = gameState.explosions[i];
+                    if (now - explosion.createdAt > 500) {
+                        explosion.element.remove();
+                        gameState.explosions.splice(i, 1);
+                    }
+                }
+            }
+
+            // 遊戲結束
+            function endGame() {
+                gameState.gameOver = true;
+                finalScoreDisplay.textContent = gameState.score;
+                gameOverScreen.classList.remove('hidden');
+            }
+
+            // 遊戲循環
+            let gameLoopId = null;
+            function gameLoop() {
+                if (gameState.gameOver) {
+                    cancelAnimationFrame(gameLoopId);
+                    gameLoopId = null;
+                    return;
+                }
+                
+                // 更新玩家位置
+                let moveX = 0;
+                let moveY = 0;
+                
+                if (gameState.keys.ArrowUp || gameState.keys.w || gameState.touchControls.up) moveY -= gameState.playerSpeed;
+                if (gameState.keys.ArrowDown || gameState.keys.s || gameState.touchControls.down) moveY += gameState.playerSpeed;
+                if (gameState.keys.ArrowLeft || gameState.keys.a || gameState.touchControls.left) moveX -= gameState.playerSpeed;
+                if (gameState.keys.ArrowRight || gameState.keys.d || gameState.touchControls.right) moveX += gameState.playerSpeed;
+                
+                // 對角線移動速度標準化
+                if (moveX !== 0 && moveY !== 0) {
+                    const factor = 1 / Math.sqrt(2);
+                    moveX *= factor;
+                    moveY *= factor;
+                }
+                
+                gameState.playerX = Math.max(20, Math.min(window.innerWidth - 20, gameState.playerX + moveX));
+                gameState.playerY = Math.max(20, Math.min(window.innerHeight - 20, gameState.playerY + moveY));
+                updatePlayerPosition();
+                
+                // 射擊
+                if (gameState.keys[' '] || gameState.touchControls.shoot) {
+                    shoot();
+                }
+                
+                // 更新子彈
+                updateBullets();
+                
+                // 創建和更新敵人
+                createEnemy();
+                updateEnemies();
+                
+                // 更新爆炸效果
+                updateExplosions();
+                
+                // 更新星星
+                updateStars();
+                
+                // 繼續遊戲循環
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+
+            // 鍵盤控制
+            window.addEventListener('keydown', (e) => {
+                if (gameState.keys.hasOwnProperty(e.key)) {
+                    gameState.keys[e.key] = true;
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                if (gameState.keys.hasOwnProperty(e.key)) {
+                    gameState.keys[e.key] = false;
+                }
+            });
+            
+            // 滑鼠控制
+            let lastMouseX = null;
+            let lastMouseY = null;
+            
+            window.addEventListener('mousemove', (e) => {
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            });
+            
+            window.addEventListener('mousedown', (e) => {
+                if (e.button === 0) { // 左鍵
+                    shoot();
+                }
+            });
+            
+            // 觸控控制
+            const upButton = document.getElementById('up-button');
+            const downButton = document.getElementById('down-button');
+            const leftButton = document.getElementById('left-button');
+            const rightButton = document.getElementById('right-button');
+            const shootButton = document.getElementById('shoot-button');
+            
+            // 檢測是否為觸控設備
+            if ('ontouchstart' in window) {
+                document.querySelectorAll('.control-pad, .shoot-button').forEach(el => {
+                    el.classList.remove('hidden');
                 });
             }
             
-            function flipCard(card, value, index) {
-                if (!canFlip || card.classList.contains('flipped') || flippedCards.length >= 2) return;
-                
-                card.classList.add('flipped');
-                flippedCards.push({ card, value, index });
-                
-                if (flippedCards.length === 2) {
-                    moves++;
-                    movesDisplay.textContent = moves;
-                    canFlip = false;
-                    
-                    setTimeout(checkMatch, 600);
-                }
-            }
+            // 方向按鈕控制
+            upButton.addEventListener('touchstart', () => { gameState.touchControls.up = true; });
+            upButton.addEventListener('touchend', () => { gameState.touchControls.up = false; });
             
-            function checkMatch() {
-                const [card1, card2] = flippedCards;
-                
-                if (card1.value === card2.value && card1.index !== card2.index) {
-                    // Match found
-                    card1.card.classList.add('matched');
-                    card2.card.classList.add('matched');
-                    matchedPairs++;
-                    
-                    if (matchedPairs === emojis.length) {
-                        setTimeout(showVictoryMessage, 300);
-                    }
-                } else {
-                    // No match
-                    card1.card.classList.remove('flipped');
-                    card2.card.classList.remove('flipped');
-                }
-                
-                flippedCards = [];
-                canFlip = true;
-            }
+            downButton.addEventListener('touchstart', () => { gameState.touchControls.down = true; });
+            downButton.addEventListener('touchend', () => { gameState.touchControls.down = false; });
             
-            function showVictoryMessage() {
-                messageDisplay.textContent = `恭喜！你用了 ${moves} 步完成了遊戲！`;
-                messageDisplay.classList.remove('hidden');
-                messageDisplay.classList.add('bg-green-100', 'text-green-800');
-                createConfetti();
-            }
+            leftButton.addEventListener('touchstart', () => { gameState.touchControls.left = true; });
+            leftButton.addEventListener('touchend', () => { gameState.touchControls.left = false; });
             
-            function createConfetti() {
-                const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
-                
-                for (let i = 0; i < 100; i++) {
-                    const confetti = document.createElement('div');
-                    confetti.className = 'confetti';
-                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                    confetti.style.left = Math.random() * 100 + 'vw';
-                    confetti.style.top = -10 + 'px';
-                    confetti.style.transform = 'rotate(' + Math.random() * 360 + 'deg)';
-                    
-                    document.body.appendChild(confetti);
-                    
-                    const animation = confetti.animate([
-                        { transform: 'translateY(0) rotate(0)', opacity: 1 },
-                        { transform: `translateY(${window.innerHeight}px) rotate(${Math.random() * 720}deg)`, opacity: 0 }
-                    ], {
-                        duration: 1500 + Math.random() * 3000,
-                        easing: 'cubic-bezier(0,0.2,0.8,1)',
-                        delay: Math.random() * 1500
-                    });
-                    
-                    animation.onfinish = () => confetti.remove();
-                }
-            }
+            rightButton.addEventListener('touchstart', () => { gameState.touchControls.right = true; });
+            rightButton.addEventListener('touchend', () => { gameState.touchControls.right = false; });
             
+            // 射擊按鈕控制
+            shootButton.addEventListener('touchstart', () => { gameState.touchControls.shoot = true; });
+            shootButton.addEventListener('touchend', () => { gameState.touchControls.shoot = false; });
+            
+            // 重新開始按鈕
             restartButton.addEventListener('click', initGame);
             
-            // Initialize the game
+            // 視窗大小變化時重新定位玩家
+            window.addEventListener('resize', () => {
+                if (gameState.playerX > window.innerWidth) {
+                    gameState.playerX = window.innerWidth / 2;
+                }
+                if (gameState.playerY > window.innerHeight) {
+                    gameState.playerY = window.innerHeight / 2;
+                }
+                updatePlayerPosition();
+            });
+            
+            // 初始化遊戲
             initGame();
         });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'950f2a2f3371f228',t:'MTc1MDEyNzg0NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'950f54f3812ef209',t:'MTc1MDEyOTU5NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
